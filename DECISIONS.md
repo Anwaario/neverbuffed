@@ -3,6 +3,22 @@
 A running log of architecture and product decisions. Update this when something important is decided so both accounts / collaborators stay in sync.
 
 ---
+## Session 2 — Supabase Live
+
+✓ Supabase project created (neverbuffed)
+✓ captures table created with full schema
+✓ photos storage bucket live and public
+✓ Row level security enabled
+✓ Capture app live at GitHub Pages URL
+✓ First real capture uploaded successfully
+✓ Feed design settled — B&W brutalist (not terminal green)
+✓ Images need GitHub raw URLs (next session)
+
+NEXT:
+- Fix image URLs to point at GitHub raw URLs
+- Wire feed to pull real captures from Supabase
+- Test full loop: capture on phone → appears in feed
+
 
 ## 2025-03 — Initial Build
 
