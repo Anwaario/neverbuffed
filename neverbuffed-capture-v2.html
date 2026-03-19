@@ -1,0 +1,973 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>NEVERBUFFED // CAPTURE</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Bebas+Neue&display=swap');
+
+  :root { --border: 3px solid #fff; --border-dim: 2px solid #333; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    background: #000;
+    color: #fff;
+    font-family: 'Space Mono', monospace;
+    min-height: 100vh;
+    overscroll-behavior: none;
+  }
+
+  /* HEADER */
+  header {
+    border-bottom: var(--border);
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    background: #000;
+    z-index: 100;
+  }
+  .logo {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 26px;
+    letter-spacing: 4px;
+  }
+  .logo span {
+    border: 2px solid #fff;
+    padding: 2px 7px;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    vertical-align: middle;
+    margin-left: 8px;
+  }
+  .hdr-right {
+    text-align: right;
+    font-size: 9px;
+    letter-spacing: 1px;
+    color: #555;
+  }
+  .hdr-right strong {
+    display: block;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 22px;
+    color: #fff;
+    letter-spacing: 2px;
+  }
+
+  /* CONFIG BANNER — shown until Supabase is connected */
+  .config-banner {
+    background: #fff;
+    color: #000;
+    padding: 12px 20px;
+    font-size: 10px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    cursor: pointer;
+    border-bottom: var(--border);
+  }
+  .config-banner strong { font-size: 13px; letter-spacing: 2px; }
+  .config-banner.connected { background: #000; color: #fff; border-color: #333; }
+
+  .config-panel {
+    background: #0a0a0a;
+    border-bottom: var(--border);
+    padding: 16px 20px;
+    display: none;
+  }
+  .config-panel.open { display: block; }
+  .config-panel .field { margin-bottom: 12px; }
+  .config-panel label {
+    display: block;
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: #888;
+    text-transform: uppercase;
+    margin-bottom: 5px;
+  }
+  .config-panel input {
+    width: 100%;
+    background: #111;
+    border: 2px solid #444;
+    color: #fff;
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    padding: 9px 12px;
+    outline: none;
+    border-radius: 0;
+    -webkit-appearance: none;
+  }
+  .config-panel input:focus { border-color: #fff; }
+  #connectBtn {
+    width: 100%;
+    background: #fff;
+    color: #000;
+    border: none;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 18px;
+    letter-spacing: 4px;
+    padding: 12px;
+    cursor: pointer;
+    margin-top: 4px;
+  }
+  #connectBtn:active { background: #ccc; }
+
+  /* CAMERA */
+  .camera-zone {
+    position: relative;
+    width: 100%;
+    background: #0a0a0a;
+    border-bottom: var(--border);
+    aspect-ratio: 4/3;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  #videoFeed {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    display: none;
+  }
+  #photoCanvas {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    display: none;
+  }
+  .cam-placeholder {
+    text-align: center;
+    color: #333;
+  }
+  .cam-placeholder svg {
+    width: 52px; height: 52px;
+    stroke: #333;
+    margin-bottom: 10px;
+  }
+  .cam-placeholder p { font-size: 10px; letter-spacing: 2px; text-transform: uppercase; }
+
+  /* GPS OVERLAY */
+  .gps-overlay {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    background: linear-gradient(transparent, rgba(0,0,0,0.88));
+    padding: 20px 14px 10px;
+    display: none;
+    justify-content: space-between;
+    align-items: flex-end;
+  }
+  .gps-text { font-size: 10px; letter-spacing: 1px; line-height: 1.7; }
+  .gps-text .lbl { color: #666; font-size: 9px; }
+  .gps-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #fff;
+    animation: blink 1.4s infinite;
+  }
+  @keyframes blink {
+    0%,100% { opacity: 1; } 50% { opacity: 0.3; }
+  }
+
+  /* GENESIS STATUS BADGE — auto set */
+  .genesis-badge {
+    position: absolute;
+    top: 12px; left: 12px;
+    padding: 5px 12px;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 18px;
+    letter-spacing: 3px;
+    display: none;
+  }
+  .genesis-badge.genesis { background: #fff; color: #000; }
+  .genesis-badge.verify { background: transparent; border: 2px solid #888; color: #888; }
+
+  /* CAMERA CONTROLS */
+  .camera-controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    border-bottom: var(--border);
+  }
+  .ctrl-btn {
+    background: none;
+    border: none;
+    border-right: 2px solid #fff;
+    color: #fff;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1px;
+    padding: 13px 8px;
+    cursor: pointer;
+    text-transform: uppercase;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    transition: background 0.1s;
+  }
+  .ctrl-btn:last-child { border-right: none; }
+  .ctrl-btn:active, .ctrl-btn.active { background: #fff; color: #000; }
+  .ctrl-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+  .ctrl-btn svg { width: 18px; height: 18px; }
+
+  /* CAPTURE BUTTON */
+  .capture-wrap {
+    padding: 16px 20px;
+    border-bottom: var(--border);
+    display: flex;
+    gap: 10px;
+  }
+  #captureBtn {
+    flex: 1;
+    background: #fff;
+    color: #000;
+    border: none;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 22px;
+    letter-spacing: 4px;
+    padding: 15px;
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+  #captureBtn:active { background: #ccc; }
+  #captureBtn:disabled { background: #222; color: #555; cursor: not-allowed; }
+  #retakeBtn {
+    display: none;
+    background: none;
+    border: 2px solid #fff;
+    color: #fff;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1px;
+    padding: 10px 14px;
+    cursor: pointer;
+    text-transform: uppercase;
+  }
+  #retakeBtn:active { background: #fff; color: #000; }
+
+  /* FORM */
+  .section { border-bottom: var(--border); }
+  .section-header {
+    padding: 11px 20px;
+    border-bottom: 2px solid #1a1a1a;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .sec-num {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 18px;
+    color: #333;
+    min-width: 22px;
+  }
+  .sec-title { font-size: 10px; letter-spacing: 3px; text-transform: uppercase; }
+  .section-body { padding: 14px 20px; }
+
+  .field { margin-bottom: 14px; }
+  .field:last-child { margin-bottom: 0; }
+  .field label {
+    display: block;
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: #666;
+    text-transform: uppercase;
+    margin-bottom: 5px;
+  }
+  .field input, .field textarea {
+    width: 100%;
+    background: #0d0d0d;
+    border: 2px solid #222;
+    color: #fff;
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    padding: 9px 12px;
+    outline: none;
+    border-radius: 0;
+    -webkit-appearance: none;
+    transition: border-color 0.15s;
+  }
+  .field input:focus, .field textarea:focus { border-color: #fff; }
+  .field textarea { resize: none; height: 68px; line-height: 1.5; }
+
+  /* QUALITY */
+  .quality-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    border: 2px solid #222;
+  }
+  .q-opt {
+    padding: 10px 4px;
+    text-align: center;
+    cursor: pointer;
+    font-size: 9px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    border-right: 2px solid #222;
+    transition: all 0.1s;
+    user-select: none;
+  }
+  .q-opt:last-child { border-right: none; }
+  .q-opt.selected { background: #fff; color: #000; }
+  .q-opt .score {
+    display: block;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 18px;
+    margin-bottom: 2px;
+  }
+
+  /* META PREVIEW */
+  .meta-box {
+    background: #080808;
+    border: 2px solid #1a1a1a;
+    padding: 12px 14px;
+    font-size: 10px;
+    line-height: 2;
+    color: #555;
+  }
+  .meta-box span { color: #fff; }
+  .meta-box .genesis-val { color: #fff; font-family: 'Bebas Neue', sans-serif; letter-spacing: 2px; }
+  .meta-box .verify-val { color: #666; font-family: 'Bebas Neue', sans-serif; letter-spacing: 2px; }
+
+  /* UPLOAD / SAVE */
+  .submit-zone { padding: 20px; }
+  #uploadBtn {
+    width: 100%;
+    background: #fff;
+    color: #000;
+    border: none;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 24px;
+    letter-spacing: 6px;
+    padding: 17px;
+    cursor: pointer;
+    transition: all 0.1s;
+  }
+  #uploadBtn:active { background: #ddd; }
+  #uploadBtn:disabled { background: #1a1a1a; color: #444; cursor: not-allowed; }
+  .upload-sub {
+    font-size: 9px;
+    color: #444;
+    letter-spacing: 1px;
+    text-align: center;
+    margin-top: 8px;
+    text-transform: uppercase;
+  }
+
+  /* PROGRESS */
+  .progress-bar {
+    height: 3px;
+    background: #111;
+    margin-top: 10px;
+    overflow: hidden;
+    display: none;
+  }
+  .progress-fill {
+    height: 100%;
+    background: #fff;
+    width: 0%;
+    transition: width 0.3s ease;
+  }
+
+  /* TOAST */
+  .toast {
+    position: fixed;
+    bottom: 28px;
+    left: 50%;
+    transform: translateX(-50%) translateY(120px);
+    background: #fff;
+    color: #000;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 20px;
+    letter-spacing: 4px;
+    padding: 13px 28px;
+    z-index: 999;
+    transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+    white-space: nowrap;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+  .toast.error { background: #000; color: #fff; border: 2px solid #fff; }
+
+  /* SESSION LOG */
+  .log-section { border-top: var(--border); padding: 20px; display: none; }
+  .log-header {
+    font-size: 9px;
+    letter-spacing: 3px;
+    color: #444;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  .log-entry {
+    border: 2px solid #1a1a1a;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 10px;
+  }
+  .log-entry .entry-id { color: #555; font-size: 9px; margin-top: 2px; }
+  .log-entry .entry-badge {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 16px;
+    letter-spacing: 2px;
+  }
+  .log-entry .g-tag { color: #fff; }
+  .log-entry .v-tag { color: #555; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="logo">NEVERBUFFED <span>CAPTURE</span></div>
+  </div>
+  <div class="hdr-right">
+    <strong id="captureTotal">0</strong>
+    SESSION
+  </div>
+</header>
+
+<!-- SUPABASE CONFIG -->
+<div class="config-banner" id="configBanner" onclick="toggleConfig()">
+  <div>
+    <strong>⚙ CONNECT SUPABASE</strong><br>
+    Tap to enter your project credentials
+  </div>
+  <span>▼</span>
+</div>
+
+<div class="config-panel" id="configPanel">
+  <div class="field">
+    <label>Supabase Project URL</label>
+    <input type="text" id="sbUrl" placeholder="https://xxxx.supabase.co" autocomplete="off" autocorrect="off" autocapitalize="off">
+  </div>
+  <div class="field">
+    <label>Supabase Anon Key</label>
+    <input type="text" id="sbKey" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI..." autocomplete="off" autocorrect="off" autocapitalize="off">
+  </div>
+  <button id="connectBtn" onclick="connectSupabase()">CONNECT</button>
+</div>
+
+<!-- CAMERA -->
+<div class="camera-zone">
+  <video id="videoFeed" autoplay playsinline muted></video>
+  <canvas id="photoCanvas"></canvas>
+
+  <div class="cam-placeholder" id="camPlaceholder">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+      <circle cx="12" cy="13" r="4"/>
+    </svg>
+    <p>Tap Start Camera</p>
+  </div>
+
+  <div class="genesis-badge" id="genesisBadge"></div>
+
+  <div class="gps-overlay" id="gpsOverlay">
+    <div class="gps-text">
+      <div class="lbl">GPS</div>
+      <div id="gpsDisplay">ACQUIRING...</div>
+    </div>
+    <div class="gps-dot"></div>
+  </div>
+</div>
+
+<!-- CONTROLS -->
+<div class="camera-controls">
+  <button class="ctrl-btn" onclick="startCamera()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="12" cy="12" r="10"/>
+      <polygon points="10,8 16,12 10,16" fill="currentColor"/>
+    </svg>
+    START
+  </button>
+  <button class="ctrl-btn" id="flipBtn" onclick="flipCamera()" disabled>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <polyline points="1,4 1,10 7,10"/>
+      <path d="M3.51,15a9,9 0,1,0 .49-3.1"/>
+    </svg>
+    FLIP
+  </button>
+  <button class="ctrl-btn" id="gpsBtn" onclick="getLocation()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="12" cy="12" r="3"/>
+      <path d="M12 2v4M12 18v4M2 12h4M18 12h4"/>
+    </svg>
+    GPS
+  </button>
+</div>
+
+<!-- CAPTURE -->
+<div class="capture-wrap">
+  <button id="captureBtn" onclick="capturePhoto()" disabled>CAPTURE</button>
+  <button id="retakeBtn" onclick="retake()">RETAKE</button>
+</div>
+
+<!-- SECTION 1: SPOTTER -->
+<div class="section">
+  <div class="section-header">
+    <span class="sec-num">01</span>
+    <span class="sec-title">Spotter ID</span>
+  </div>
+  <div class="section-body">
+    <div class="field">
+      <label>Your Handle</label>
+      <input type="text" id="spotterID" value="spotter_001" autocomplete="off" autocorrect="off" autocapitalize="off">
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 2: QUALITY -->
+<div class="section">
+  <div class="section-header">
+    <span class="sec-num">02</span>
+    <span class="sec-title">Photo Quality</span>
+  </div>
+  <div class="section-body">
+    <div class="quality-grid">
+      <div class="q-opt" id="q-excellent" onclick="selectQuality('Excellent', 1.5, this)">
+        <span class="score">1.5×</span>EXCEL
+      </div>
+      <div class="q-opt selected" id="q-good" onclick="selectQuality('Good', 1.0, this)">
+        <span class="score">1.0×</span>GOOD
+      </div>
+      <div class="q-opt" id="q-fair" onclick="selectQuality('Fair', 0.7, this)">
+        <span class="score">0.7×</span>FAIR
+      </div>
+      <div class="q-opt" id="q-poor" onclick="selectQuality('Poor', 0.5, this)">
+        <span class="score">0.5×</span>POOR
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 3: NOTES -->
+<div class="section">
+  <div class="section-header">
+    <span class="sec-num">03</span>
+    <span class="sec-title">Field Notes</span>
+  </div>
+  <div class="section-body">
+    <div class="field">
+      <textarea id="notesField" placeholder="Surface, style, dimensions, anything notable..."></textarea>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 4: METADATA -->
+<div class="section">
+  <div class="section-header">
+    <span class="sec-num">04</span>
+    <span class="sec-title">Metadata Preview</span>
+  </div>
+  <div class="section-body">
+    <div class="meta-box">
+      GPS_RAW &nbsp;&nbsp;— <span id="pv-gps">NONE</span><br>
+      GPS_GRID — <span id="pv-grid">NONE</span><br>
+      TIMESTAMP — <span id="pv-ts">—</span><br>
+      SPOTTER &nbsp;— <span id="pv-spotter">spotter_001</span><br>
+      TYPE &nbsp;&nbsp;&nbsp;&nbsp;— <span id="pv-type">CHECKING...</span><br>
+      QUALITY &nbsp;— <span id="pv-quality">Good (1.0×)</span><br>
+      REWARD &nbsp;&nbsp;— <span id="pv-reward">— $BUFF</span><br>
+      PHOTO &nbsp;&nbsp;&nbsp;— <span id="pv-photo">NOT CAPTURED</span>
+    </div>
+  </div>
+</div>
+
+<!-- UPLOAD -->
+<div class="submit-zone">
+  <button id="uploadBtn" onclick="uploadCapture()" disabled>UPLOAD TO NEVERBUFFED</button>
+  <div class="progress-bar" id="progressBar">
+    <div class="progress-fill" id="progressFill"></div>
+  </div>
+  <p class="upload-sub" id="uploadSub">Capture a photo to enable upload</p>
+</div>
+
+<!-- SESSION LOG -->
+<div class="log-section" id="logSection">
+  <div class="log-header">Session Log</div>
+  <div id="logList"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── SUPABASE ───────────────────────────────────────────────
+let sb = null;
+const BUCKET = 'photos';
+const TABLE  = 'captures';
+
+// Try restoring saved credentials
+const savedUrl = localStorage.getItem('nb_sb_url');
+const savedKey = localStorage.getItem('nb_sb_key');
+if (savedUrl && savedKey) {
+  document.getElementById('sbUrl').value = savedUrl;
+  document.getElementById('sbKey').value = savedKey;
+  connectSupabase(true);
+}
+
+function toggleConfig() {
+  document.getElementById('configPanel').classList.toggle('open');
+}
+
+function connectSupabase(silent = false) {
+  const url = document.getElementById('sbUrl').value.trim();
+  const key = document.getElementById('sbKey').value.trim();
+  if (!url || !key) { showToast('ENTER URL + KEY', true); return; }
+
+  sb = supabase.createClient(url, key);
+  localStorage.setItem('nb_sb_url', url);
+  localStorage.setItem('nb_sb_key', key);
+
+  const banner = document.getElementById('configBanner');
+  banner.innerHTML = `<div><strong>✓ SUPABASE CONNECTED</strong><br>${url.replace('https://','').split('.')[0]}.supabase.co</div><span style="font-size:10px;color:#888">TAP TO EDIT</span>`;
+  banner.classList.add('connected');
+  document.getElementById('configPanel').classList.remove('open');
+  if (!silent) showToast('CONNECTED ✓');
+}
+
+// ─── STATE ──────────────────────────────────────────────────
+let stream       = null;
+let useFront     = false;
+let coords       = null;
+let photoTaken   = false;
+let isGenesis    = null; // null = unknown, true = genesis, false = verify
+let genesisRef   = null; // ID of original capture if verifying
+let qualityLabel = 'Good';
+let qualityMult  = 1.0;
+let sessionLog   = [];
+let isUploading  = false;
+
+const video  = document.getElementById('videoFeed');
+const canvas = document.getElementById('photoCanvas');
+const ctx    = canvas.getContext('2d');
+
+// ─── CAMERA ─────────────────────────────────────────────────
+async function startCamera() {
+  try {
+    if (stream) stream.getTracks().forEach(t => t.stop());
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: useFront ? 'user' : 'environment', width: { ideal: 1280 }, height: { ideal: 960 } }
+    });
+    video.srcObject = stream;
+    video.style.display = 'block';
+    canvas.style.display = 'none';
+    document.getElementById('camPlaceholder').style.display = 'none';
+    document.getElementById('captureBtn').disabled = false;
+    document.getElementById('flipBtn').disabled = false;
+    document.getElementById('retakeBtn').style.display = 'none';
+    document.getElementById('gpsOverlay').style.display = 'flex';
+    photoTaken = false;
+    getLocation();
+    updatePreview();
+  } catch(e) {
+    showToast('CAMERA DENIED', true);
+  }
+}
+
+function flipCamera() {
+  useFront = !useFront;
+  startCamera();
+}
+
+// ─── GPS ────────────────────────────────────────────────────
+function getLocation() {
+  document.getElementById('gpsDisplay').textContent = 'ACQUIRING...';
+  if (!navigator.geolocation) { document.getElementById('gpsDisplay').textContent = 'UNAVAILABLE'; return; }
+
+  navigator.geolocation.getCurrentPosition(pos => {
+    coords = pos.coords;
+    document.getElementById('gpsDisplay').textContent =
+      `${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)}`;
+    updatePreview();
+    if (sb) checkGenesis(); // auto-check as soon as we have GPS
+  }, () => {
+    document.getElementById('gpsDisplay').textContent = 'GPS DENIED';
+  }, { enableHighAccuracy: true, timeout: 12000 });
+}
+
+function gpsGrid(lat, lng) {
+  return `${(Math.round(lat * 100) / 100)},${(Math.round(lng * 100) / 100)}`;
+}
+
+// ─── GENESIS AUTO-CHECK ─────────────────────────────────────
+async function checkGenesis() {
+  if (!coords || !sb) return;
+  const grid = gpsGrid(coords.latitude, coords.longitude);
+
+  const { data, error } = await sb
+    .from(TABLE)
+    .select('id, timestamp, spotter_id')
+    .eq('gps_grid', grid)
+    .order('timestamp', { ascending: true })
+    .limit(1);
+
+  if (error) { console.warn('Genesis check error:', error); return; }
+
+  const badge = document.getElementById('genesisBadge');
+  if (data && data.length > 0) {
+    isGenesis = false;
+    genesisRef = data[0].id;
+    badge.textContent = '✓ VERIFY';
+    badge.className = 'genesis-badge verify';
+  } else {
+    isGenesis = true;
+    genesisRef = null;
+    badge.textContent = '⚡ GENESIS';
+    badge.className = 'genesis-badge genesis';
+  }
+  badge.style.display = 'block';
+  updatePreview();
+}
+
+// ─── CAPTURE + WATERMARK ────────────────────────────────────
+function capturePhoto() {
+  if (!stream) return;
+  const vw = video.videoWidth || 1280;
+  const vh = video.videoHeight || 960;
+  canvas.width = vw;
+  canvas.height = vh;
+  ctx.drawImage(video, 0, 0, vw, vh);
+  applyWatermark(ctx, vw, vh);
+
+  video.style.display = 'none';
+  canvas.style.display = 'block';
+  document.getElementById('captureBtn').disabled = true;
+  document.getElementById('retakeBtn').style.display = 'block';
+  photoTaken = true;
+
+  document.getElementById('uploadBtn').disabled = false;
+  document.getElementById('uploadSub').textContent = sb
+    ? 'Ready to upload to NeverBuffed'
+    : 'Connect Supabase first to upload';
+  document.getElementById('pv-photo').textContent = 'READY';
+  updatePreview();
+}
+
+function applyWatermark(ctx, w, h) {
+  const now   = new Date();
+  const ts    = now.toISOString().replace('T',' ').substring(0,19);
+  const gps   = coords ? `${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)}` : 'GPS PENDING';
+  const type  = isGenesis === true ? '⚡ GENESIS' : isGenesis === false ? '✓ VERIFY' : 'UNVERIFIED';
+
+  const barH = Math.round(h * 0.11);
+  ctx.fillStyle = 'rgba(0,0,0,0.84)';
+  ctx.fillRect(0, h - barH, w, barH);
+
+  // Logo badge
+  const bW = Math.round(w * 0.26), bH = Math.round(h * 0.055);
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(w - bW - 10, 10, bW, bH);
+  ctx.fillStyle = '#000';
+  ctx.font = `bold ${Math.round(h*0.023)}px 'Courier New', monospace`;
+  ctx.textAlign = 'center';
+  ctx.fillText('NEVERBUFFED.IO', w - bW/2 - 10, 10 + bH * 0.7);
+
+  const fs = Math.round(h * 0.021);
+  ctx.font = `${fs}px 'Courier New', monospace`;
+
+  // Bottom left
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#666'; ctx.fillText('GPS', 14, h - barH + barH*0.28);
+  ctx.fillStyle = '#fff'; ctx.fillText(gps, 14, h - barH + barH*0.62);
+  ctx.fillStyle = '#666'; ctx.fillText(ts + ' UTC', 14, h - barH + barH*0.9);
+
+  // Bottom right
+  ctx.textAlign = 'right';
+  ctx.fillStyle = '#666'; ctx.fillText('TYPE', w-14, h - barH + barH*0.28);
+  ctx.fillStyle = '#fff'; ctx.fillText(type, w-14, h - barH + barH*0.62);
+  ctx.fillStyle = '#666'; ctx.fillText(qualityLabel.toUpperCase(), w-14, h - barH + barH*0.9);
+}
+
+function retake() {
+  canvas.style.display = 'none';
+  video.style.display = 'block';
+  document.getElementById('captureBtn').disabled = false;
+  document.getElementById('retakeBtn').style.display = 'none';
+  photoTaken = false;
+  document.getElementById('uploadBtn').disabled = true;
+  document.getElementById('pv-photo').textContent = 'NOT CAPTURED';
+  document.getElementById('uploadSub').textContent = 'Capture a photo to enable upload';
+}
+
+// ─── QUALITY ────────────────────────────────────────────────
+function selectQuality(label, mult, el) {
+  qualityLabel = label; qualityMult = mult;
+  document.querySelectorAll('.q-opt').forEach(e => e.classList.remove('selected'));
+  el.classList.add('selected');
+  updatePreview();
+}
+
+// ─── PREVIEW ────────────────────────────────────────────────
+function updatePreview() {
+  const spotter = document.getElementById('spotterID').value || 'spotter_001';
+  const rewardBase = isGenesis === true ? 100 : 10;
+  const reward = isGenesis !== null ? Math.round(rewardBase * qualityMult) : '—';
+
+  document.getElementById('pv-ts').textContent = new Date().toISOString().substring(0,19).replace('T',' ');
+  document.getElementById('pv-spotter').textContent = spotter;
+  document.getElementById('pv-quality').textContent = `${qualityLabel} (${qualityMult}×)`;
+  document.getElementById('pv-reward').textContent = `${reward} $BUFF`;
+
+  const typeEl = document.getElementById('pv-type');
+  if (isGenesis === true) {
+    typeEl.className = 'genesis-val';
+    typeEl.textContent = '⚡ GENESIS';
+  } else if (isGenesis === false) {
+    typeEl.className = 'verify-val';
+    typeEl.textContent = '✓ VERIFY';
+  } else {
+    typeEl.className = '';
+    typeEl.textContent = coords ? 'CHECKING...' : 'NEED GPS';
+  }
+
+  if (coords) {
+    const rGrid = gpsGrid(coords.latitude, coords.longitude);
+    document.getElementById('pv-gps').textContent = `${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)}`;
+    document.getElementById('pv-grid').textContent = rGrid;
+  }
+}
+
+// ─── UPLOAD ─────────────────────────────────────────────────
+async function uploadCapture() {
+  if (!photoTaken || isUploading) return;
+  if (!sb) { showToast('CONNECT SUPABASE FIRST', true); return; }
+  if (!coords) { showToast('NEED GPS LOCK', true); return; }
+
+  isUploading = true;
+  document.getElementById('uploadBtn').disabled = true;
+  document.getElementById('uploadBtn').textContent = 'UPLOADING...';
+  const bar = document.getElementById('progressBar');
+  const fill = document.getElementById('progressFill');
+  bar.style.display = 'block';
+  fill.style.width = '20%';
+
+  const captureID = `NB-${Date.now()}`;
+  const filename  = `${captureID}.jpg`;
+  const ts        = new Date().toISOString();
+  const spotter   = document.getElementById('spotterID').value || 'spotter_001';
+  const notes     = document.getElementById('notesField').value;
+  const lat       = coords.latitude;
+  const lng       = coords.longitude;
+  const grid      = gpsGrid(lat, lng);
+  const rewardBase = isGenesis ? 100 : 10;
+  const reward    = Math.round(rewardBase * qualityMult);
+
+  try {
+    // 1. Convert canvas to blob
+    fill.style.width = '35%';
+    const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.92));
+
+    // 2. Upload photo to Supabase Storage
+    fill.style.width = '55%';
+    const { error: storageErr } = await sb.storage
+      .from(BUCKET)
+      .upload(filename, blob, { contentType: 'image/jpeg', upsert: false });
+
+    if (storageErr) throw new Error('Photo upload failed: ' + storageErr.message);
+
+    // 3. Get public URL
+    fill.style.width = '70%';
+    const { data: urlData } = sb.storage.from(BUCKET).getPublicUrl(filename);
+    const photoUrl = urlData.publicUrl;
+
+    // 4. Insert metadata record
+    fill.style.width = '85%';
+    const record = {
+      capture_id:          captureID,
+      timestamp:           ts,
+      spotter_id:          spotter,
+      gps_raw:             `${lat.toFixed(5)},${lng.toFixed(5)}`,
+      gps_grid:            grid,
+      latitude:            lat,
+      longitude:           lng,
+      genesis_capture:     isGenesis ?? true,
+      genesis_ref_id:      genesisRef,
+      capture_quality:     qualityLabel,
+      reward_multiplier:   qualityMult,
+      reward_base:         rewardBase,
+      total_reward:        reward,
+      notes:               notes,
+      verification_status: 'Pending',
+      photo_url:           photoUrl,
+      photo_filename:      filename
+    };
+
+    const { error: dbErr } = await sb.from(TABLE).insert([record]);
+    if (dbErr) throw new Error('DB insert failed: ' + dbErr.message);
+
+    fill.style.width = '100%';
+
+    // Log to session
+    sessionLog.unshift({ ...record, is_genesis: isGenesis });
+    updateLog();
+    document.getElementById('captureTotal').textContent = sessionLog.length;
+
+    showToast(isGenesis ? '⚡ GENESIS LIVE' : '✓ VERIFIED LIVE');
+
+    // Reset
+    setTimeout(() => {
+      retake();
+      document.getElementById('notesField').value = '';
+      isGenesis = null;
+      genesisRef = null;
+      document.getElementById('genesisBadge').style.display = 'none';
+      document.getElementById('uploadBtn').textContent = 'UPLOAD TO NEVERBUFFED';
+      bar.style.display = 'none';
+      fill.style.width = '0%';
+      isUploading = false;
+      updatePreview();
+      if (coords) checkGenesis();
+    }, 800);
+
+  } catch(e) {
+    console.error(e);
+    showToast('UPLOAD FAILED', true);
+    document.getElementById('uploadBtn').disabled = false;
+    document.getElementById('uploadBtn').textContent = 'UPLOAD TO NEVERBUFFED';
+    bar.style.display = 'none';
+    fill.style.width = '0%';
+    isUploading = false;
+  }
+}
+
+// ─── LOG ────────────────────────────────────────────────────
+function updateLog() {
+  document.getElementById('logSection').style.display = 'block';
+  document.getElementById('logList').innerHTML = sessionLog.map(e => `
+    <div class="log-entry">
+      <div>
+        <div>${e.capture_id}</div>
+        <div class="entry-id">${e.gps_raw}</div>
+      </div>
+      <div style="text-align:right">
+        <div class="entry-badge ${e.genesis_capture ? 'g-tag' : 'v-tag'}">
+          ${e.genesis_capture ? '⚡ GENESIS' : '✓ VERIFY'}
+        </div>
+        <div class="entry-id">${e.timestamp.substring(11,19)} UTC</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ─── TOAST ──────────────────────────────────────────────────
+function showToast(msg, isErr = false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast' + (isErr ? ' error' : '');
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+// ─── LIVE PREVIEW ───────────────────────────────────────────
+document.getElementById('spotterID').addEventListener('input', updatePreview);
+updatePreview();
+</script>
+</body>
+</html>

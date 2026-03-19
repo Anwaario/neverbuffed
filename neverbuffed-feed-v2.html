@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEVERBUFFED // LIVE FEED</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Bebas+Neue&display=swap');
+
+  :root {
+    --border: 3px solid #fff;
+    --border-dim: 1px solid #222;
+    --rail: 280px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    background: #000;
+    color: #fff;
+    font-family: 'Space Mono', monospace;
+    min-height: 100vh;
+  }
+
+  /* ── HEADER ── */
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 200;
+    background: #000;
+    border-bottom: var(--border);
+  }
+
+  .hdr-top {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    padding: 14px 24px;
+    gap: 20px;
+  }
+
+  .logo {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 32px;
+    letter-spacing: 5px;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  .logo em {
+    font-style: normal;
+    border: 2px solid #fff;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 3px;
+    padding: 2px 8px;
+    vertical-align: middle;
+    margin-left: 10px;
+  }
+
+  .hdr-stats {
+    display: flex;
+    gap: 0;
+    justify-content: center;
+  }
+
+  .stat-pill {
+    border: 2px solid #333;
+    border-right: none;
+    padding: 6px 16px;
+    text-align: center;
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: #555;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .stat-pill:last-child { border-right: 2px solid #333; }
+  .stat-pill strong {
+    display: block;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 20px;
+    color: #fff;
+    letter-spacing: 2px;
+    line-height: 1.1;
+  }
+
+  .hdr-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .btn-capture {
+    background: #fff;
+    color: #000;
+    border: none;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 18px;
+    letter-spacing: 3px;
+    padding: 10px 20px;
+    cursor: pointer;
+    white-space: nowrap;
+    text-decoration: none;
+    display: inline-block;
+  }
+  .btn-capture:hover { background: #ddd; }
+
+  /* Filter bar */
+  .filter-bar {
+    display: flex;
+    border-top: 2px solid #1a1a1a;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .filter-bar::-webkit-scrollbar { display: none; }
+
+  .filter-btn {
+    background: none;
+    border: none;
+    border-right: 2px solid #1a1a1a;
+    color: #555;
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 2px;
+    padding: 9px 18px;
+    cursor: pointer;
+    text-transform: uppercase;
+    white-space: nowrap;
+    transition: all 0.1s;
+  }
+  .filter-btn:hover { color: #fff; }
+  .filter-btn.active { background: #fff; color: #000; }
+
+  /* ── LIVE TICKER ── */
+  .ticker-wrap {
+    border-bottom: 2px solid #1a1a1a;
+    overflow: hidden;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    background: #050505;
+  }
+  .ticker-label {
+    background: #fff;
+    color: #000;
+    font-size: 9px;
+    letter-spacing: 3px;
+    padding: 0 12px;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    font-weight: 700;
+  }
+  .ticker-track {
+    display: flex;
+    gap: 40px;
+    animation: ticker 28s linear infinite;
+    padding-left: 30px;
+    white-space: nowrap;
+    font-size: 9px;
+    letter-spacing: 1px;
+    color: #555;
+  }
+  .ticker-track span { color: #fff; }
+  @keyframes ticker {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+
+  /* ── LAYOUT ── */
+  .layout {
+    display: grid;
+    grid-template-columns: 1fr var(--rail);
+    min-height: calc(100vh - 140px);
+  }
+
+  /* ── FEED ── */
+  .feed-area {
+    border-right: var(--border);
+    overflow: hidden;
+  }
+
+  .feed-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0;
+  }
+
+  /* ── CARD ── */
+  .card {
+    position: relative;
+    aspect-ratio: 1;
+    overflow: hidden;
+    border-right: 2px solid #111;
+    border-bottom: 2px solid #111;
+    cursor: pointer;
+    background: #0a0a0a;
+  }
+
+  .card:hover { border-color: #fff; z-index: 10; }
+
+  .card img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    opacity: 0.8;
+    transition: opacity 0.2s, transform 0.3s;
+  }
+  .card:hover img { opacity: 1; transform: scale(1.03); }
+
+  /* Genesis flash border */
+  .card.genesis { border: 2px solid #fff; }
+  .card.genesis::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border: 2px solid #fff;
+    animation: genesisPulse 2s ease-in-out 3;
+    z-index: 5;
+    pointer-events: none;
+  }
+  @keyframes genesisPulse {
+    0%,100% { opacity: 1; } 50% { opacity: 0; }
+  }
+
+  .card-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.3) 50%, transparent 100%);
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 12px;
+    transition: opacity 0.2s;
+  }
+
+  .card-timer {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 28px;
+    letter-spacing: 2px;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    margin-bottom: 4px;
+  }
+  .card-timer.long { font-size: 22px; }
+
+  .card-loc {
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: #aaa;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+  }
+
+  .tag {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 13px;
+    letter-spacing: 2px;
+    padding: 2px 7px;
+  }
+  .tag.genesis-tag { background: #fff; color: #000; }
+  .tag.verified-tag { border: 1px solid #fff; color: #fff; }
+  .tag.pending-tag { border: 1px solid #444; color: #555; }
+  .tag.buffed-tag { background: #444; color: #888; text-decoration: line-through; }
+
+  .card-vals {
+    font-size: 9px;
+    color: #666;
+    letter-spacing: 1px;
+    text-align: right;
+    line-height: 1.6;
+  }
+  .card-vals span { color: #fff; }
+
+  /* Top-right badge */
+  .card-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    font-size: 9px;
+    letter-spacing: 1px;
+    background: rgba(0,0,0,0.75);
+    padding: 3px 7px;
+    border: 1px solid #333;
+    text-transform: uppercase;
+  }
+
+  /* Skeleton loader */
+  .card.skeleton img { display: none; }
+  .card.skeleton .card-overlay { background: #0d0d0d; }
+  .card.skeleton .card-timer,
+  .card.skeleton .card-loc,
+  .card.skeleton .tag,
+  .card.skeleton .card-vals {
+    background: #1a1a1a;
+    color: transparent;
+    border-radius: 0;
+    animation: shimmer 1.4s infinite;
+  }
+  @keyframes shimmer {
+    0%,100% { opacity: 0.5; } 50% { opacity: 1; }
+  }
+
+  /* ── DETAIL PANEL (hover expand) ── */
+  .card-detail {
+    position: absolute;
+    inset: 0;
+    background: #000;
+    display: flex;
+    flex-direction: column;
+    padding: 14px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+    z-index: 20;
+    font-size: 10px;
+    letter-spacing: 1px;
+    overflow: hidden;
+  }
+  .card:hover .card-detail { opacity: 1; pointer-events: auto; }
+  .card:hover .card-overlay { opacity: 0; }
+  .card:hover img { display: none; }
+
+  .detail-label { color: #444; font-size: 9px; letter-spacing: 2px; margin-bottom: 2px; text-transform: uppercase; }
+  .detail-val { color: #fff; margin-bottom: 10px; font-size: 11px; }
+  .detail-divider { border-top: 1px solid #1a1a1a; margin: 8px 0; }
+
+  /* ── ACTIVITY RAIL ── */
+  .rail {
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: #222 #000;
+  }
+  .rail::-webkit-scrollbar { width: 4px; }
+  .rail::-webkit-scrollbar-track { background: #000; }
+  .rail::-webkit-scrollbar-thumb { background: #222; }
+
+  .rail-header {
+    padding: 14px 16px;
+    font-size: 9px;
+    letter-spacing: 3px;
+    color: #444;
+    border-bottom: 2px solid #1a1a1a;
+    position: sticky;
+    top: 0;
+    background: #000;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .live-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: #fff;
+    animation: blink 1.5s infinite;
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+  .activity-item {
+    padding: 12px 16px;
+    border-bottom: 1px solid #111;
+    font-size: 10px;
+    letter-spacing: 1px;
+    line-height: 1.6;
+    transition: background 0.1s;
+  }
+  .activity-item:hover { background: #0a0a0a; }
+  .activity-item.fresh { animation: flashIn 0.5s ease; }
+  @keyframes flashIn {
+    0% { background: #1a1a1a; }
+    100% { background: transparent; }
+  }
+
+  .act-time { color: #444; font-size: 9px; margin-bottom: 3px; letter-spacing: 1px; }
+  .act-type {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 15px;
+    letter-spacing: 2px;
+    margin-bottom: 1px;
+  }
+  .act-type.genesis { color: #fff; }
+  .act-type.verify { color: #888; }
+  .act-type.buffed { color: #555; }
+  .act-type.reward { color: #fff; }
+  .act-loc { color: #555; font-size: 9px; }
+
+  /* ── EMPTY STATE ── */
+  .empty-state {
+    grid-column: 1 / -1;
+    padding: 80px 40px;
+    text-align: center;
+    color: #333;
+  }
+  .empty-state p { font-size: 10px; letter-spacing: 3px; text-transform: uppercase; margin-top: 10px; }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 1100px) {
+    .layout { grid-template-columns: 1fr; }
+    .rail { display: none; }
+    .feed-area { border-right: none; }
+  }
+  @media (max-width: 768px) {
+    .feed-grid { grid-template-columns: repeat(2, 1fr); }
+    .hdr-stats { display: none; }
+    .logo { font-size: 24px; }
+    .stat-pill { display: none; }
+  }
+  @media (max-width: 480px) {
+    .feed-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hdr-top">
+    <div class="logo">NEVERBUFFED <em>LIVE</em></div>
+    <div class="hdr-stats">
+      <div class="stat-pill"><strong id="statTotal">—</strong>PIECES</div>
+      <div class="stat-pill"><strong id="statGenesis">—</strong>GENESIS</div>
+      <div class="stat-pill"><strong id="statVerified">—</strong>VERIFIED</div>
+      <div class="stat-pill"><strong id="statBuffed">—</strong>BUFFED</div>
+    </div>
+    <div class="hdr-actions">
+      <a class="btn-capture" href="neverbuffed-capture-v2.html">+ CAPTURE</a>
+    </div>
+  </div>
+  <div class="filter-bar">
+    <button class="filter-btn active" onclick="setFilter('all', this)">ALL</button>
+    <button class="filter-btn" onclick="setFilter('genesis', this)">⚡ GENESIS ONLY</button>
+    <button class="filter-btn" onclick="setFilter('verified', this)">✓ VERIFIED</button>
+    <button class="filter-btn" onclick="setFilter('pending', this)">PENDING</button>
+    <button class="filter-btn" onclick="setFilter('buffed', this)">BUFFED</button>
+    <button class="filter-btn" onclick="setFilter('recent', this)">RECENT 24H</button>
+  </div>
+</header>
+
+<!-- TICKER -->
+<div class="ticker-wrap">
+  <div class="ticker-label">LIVE</div>
+  <div class="ticker-track" id="tickerTrack">
+    <span>⚡ GENESIS</span> BROOKLYN NY —
+    <span>✓ VERIFY</span> TOKYO JP —
+    <span>⚡ GENESIS</span> BERLIN DE —
+    <span>✓ VERIFY</span> PARIS FR —
+    <span>💀 BUFFED</span> CHICAGO IL — 6.5 DAYS —
+    <span>⚡ GENESIS</span> LONDON UK —
+    <span>✓ VERIFY</span> AMSTERDAM NL —
+    <span>⚡ GENESIS</span> BROOKLYN NY —
+    <span>✓ VERIFY</span> TOKYO JP —
+    <span>⚡ GENESIS</span> BERLIN DE —
+    <span>✓ VERIFY</span> PARIS FR —
+    <span>💀 BUFFED</span> CHICAGO IL — 6.5 DAYS —
+    <span>⚡ GENESIS</span> LONDON UK —
+    <span>✓ VERIFY</span> AMSTERDAM NL —
+  </div>
+</div>
+
+<div class="layout">
+
+  <!-- FEED -->
+  <div class="feed-area">
+    <div class="feed-grid" id="feedGrid">
+      <!-- skeleton placeholders -->
+      <div class="card skeleton"><div class="card-overlay"><div class="card-timer">000:00:00</div><div class="card-loc">LOADING...</div><div class="card-footer"><span class="tag genesis-tag">GENESIS</span></div></div></div>
+      <div class="card skeleton"><div class="card-overlay"><div class="card-timer">000:00:00</div><div class="card-loc">LOADING...</div><div class="card-footer"><span class="tag verified-tag">VERIFY</span></div></div></div>
+      <div class="card skeleton"><div class="card-overlay"><div class="card-timer">000:00:00</div><div class="card-loc">LOADING...</div><div class="card-footer"><span class="tag pending-tag">PENDING</span></div></div></div>
+      <div class="card skeleton"><div class="card-overlay"><div class="card-timer">000:00:00</div><div class="card-loc">LOADING...</div><div class="card-footer"><span class="tag genesis-tag">GENESIS</span></div></div></div>
+      <div class="card skeleton"><div class="card-overlay"><div class="card-timer">000:00:00</div><div class="card-loc">LOADING...</div><div class="card-footer"><span class="tag verified-tag">VERIFY</span></div></div></div>
+      <div class="card skeleton"><div class="card-overlay"><div class="card-timer">000:00:00</div><div class="card-loc">LOADING...</div><div class="card-footer"><span class="tag pending-tag">PENDING</span></div></div></div>
+    </div>
+  </div>
+
+  <!-- ACTIVITY RAIL -->
+  <div class="rail">
+    <div class="rail-header">
+      ACTIVITY
+      <div class="live-dot"></div>
+    </div>
+    <div id="activityList"></div>
+  </div>
+
+</div>
+
+<script>
+// ─── SUPABASE CONFIG ─────────────────────────────────────────
+// Reads from same localStorage as capture app
+const SUPABASE_URL = localStorage.getItem('nb_sb_url') || '';
+const SUPABASE_KEY = localStorage.getItem('nb_sb_key') || '';
+const TABLE = 'captures';
+const BUCKET = 'photos';
+
+let sb = null;
+let allCaptures = [];
+let activeFilter = 'all';
+let timers = {};
+
+if (SUPABASE_URL && SUPABASE_KEY) {
+  sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  init();
+} else {
+  // Show demo mode with mock data
+  loadDemoData();
+}
+
+async function init() {
+  await loadCaptures();
+  subscribeRealtime();
+  startTimers();
+  loadStats();
+}
+
+// ─── LOAD ────────────────────────────────────────────────────
+async function loadCaptures() {
+  const { data, error } = await sb
+    .from(TABLE)
+    .select('*')
+    .order('timestamp', { ascending: false })
+    .limit(60);
+
+  if (error) { console.error(error); loadDemoData(); return; }
+  allCaptures = data || [];
+  renderFeed(allCaptures);
+  renderActivity(allCaptures.slice(0, 20));
+}
+
+async function loadStats() {
+  if (!sb) return;
+  const { data } = await sb.from(TABLE).select('genesis_capture, verification_status');
+  if (!data) return;
+  const total    = data.length;
+  const genesis  = data.filter(d => d.genesis_capture).length;
+  const verified = data.filter(d => d.verification_status === 'Verified').length;
+  const buffed   = data.filter(d => d.verification_status === 'Buffed').length;
+  document.getElementById('statTotal').textContent   = total;
+  document.getElementById('statGenesis').textContent  = genesis;
+  document.getElementById('statVerified').textContent = verified;
+  document.getElementById('statBuffed').textContent   = buffed;
+}
+
+// ─── REALTIME ────────────────────────────────────────────────
+function subscribeRealtime() {
+  if (!sb) return;
+  sb.channel('captures-feed')
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: TABLE }, payload => {
+      const capture = payload.new;
+      allCaptures.unshift(capture);
+      prependCard(capture);
+      prependActivity(capture, true);
+      loadStats();
+    })
+    .subscribe();
+}
+
+// ─── RENDER FEED ─────────────────────────────────────────────
+function renderFeed(captures) {
+  const grid = document.getElementById('feedGrid');
+  if (!captures.length) {
+    grid.innerHTML = `<div class="empty-state">
+      <p>No captures yet.<br>Be the first to document.</p>
+    </div>`;
+    return;
+  }
+  grid.innerHTML = captures.map(c => cardHTML(c)).join('');
+  startTimers();
+}
+
+function cardHTML(c) {
+  const isGenesis = c.genesis_capture;
+  const status    = c.verification_status || 'Pending';
+  const tagClass  = isGenesis ? 'genesis-tag' : status === 'Verified' ? 'verified-tag' : status === 'Buffed' ? 'buffed-tag' : 'pending-tag';
+  const tagLabel  = isGenesis ? '⚡ GENESIS' : status === 'Verified' ? '✓ VERIFIED' : status === 'Buffed' ? '💀 BUFFED' : 'PENDING';
+  const elapsed   = elapsedStr(c.timestamp);
+  const loc       = c.gps_grid || c.gps_raw || 'UNKNOWN';
+  const vals      = c.total_reward || 0;
+  const spotter   = c.spotter_id || '—';
+  const imgSrc    = c.photo_url ? `src="${c.photo_url}"` : `src="https://images.unsplash.com/photo-1499781350541-7783f6c6a0c8?w=400&h=400&fit=crop"`;
+  const isNew     = (Date.now() - new Date(c.timestamp).getTime()) < 120000;
+
+  return `<div class="card ${isGenesis ? 'genesis' : ''}" data-id="${c.id}" data-ts="${c.timestamp}">
+    <img ${imgSrc} alt="Graffiti capture" loading="lazy">
+    <div class="card-overlay">
+      <div class="card-timer" data-ts="${c.timestamp}">${elapsed}</div>
+      <div class="card-loc">${loc}</div>
+      <div class="card-footer">
+        <span class="tag ${tagClass}">${tagLabel}</span>
+        <div class="card-vals">
+          <span>${vals}</span> $BUFF<br>
+          <span>${spotter}</span>
+        </div>
+      </div>
+    </div>
+    <div class="card-detail">
+      <div class="detail-label">Capture ID</div>
+      <div class="detail-val">${c.capture_id || c.id}</div>
+      <div class="detail-label">GPS</div>
+      <div class="detail-val">${c.gps_raw || '—'}</div>
+      <div class="detail-label">Grid</div>
+      <div class="detail-val">${c.gps_grid || '—'}</div>
+      <div class="detail-divider"></div>
+      <div class="detail-label">Spotter</div>
+      <div class="detail-val">${spotter}</div>
+      <div class="detail-label">Quality</div>
+      <div class="detail-val">${c.capture_quality || '—'} (${c.reward_multiplier || 1}×)</div>
+      <div class="detail-label">Status</div>
+      <div class="detail-val">${tagLabel}</div>
+      <div class="detail-label">Notes</div>
+      <div class="detail-val" style="font-size:9px;color:#888;line-height:1.6">${c.notes || 'No notes'}</div>
+      <div class="detail-divider"></div>
+      <div class="detail-label">Timestamp</div>
+      <div class="detail-val" style="font-size:9px">${c.timestamp ? new Date(c.timestamp).toISOString().replace('T',' ').substring(0,19) + ' UTC' : '—'}</div>
+    </div>
+  </div>`;
+}
+
+function prependCard(c) {
+  const grid = document.getElementById('feedGrid');
+  const div  = document.createElement('div');
+  div.innerHTML = cardHTML(c);
+  const card = div.firstElementChild;
+  card.style.opacity = '0';
+  grid.prepend(card);
+  setTimeout(() => { card.style.transition = 'opacity 0.5s'; card.style.opacity = '1'; }, 50);
+}
+
+// ─── ACTIVITY RAIL ───────────────────────────────────────────
+function renderActivity(captures) {
+  const list = document.getElementById('activityList');
+  list.innerHTML = captures.map(c => activityHTML(c, false)).join('');
+}
+
+function prependActivity(c, fresh = false) {
+  const list = document.getElementById('activityList');
+  const div  = document.createElement('div');
+  div.innerHTML = activityHTML(c, fresh);
+  list.prepend(div.firstElementChild);
+  if (list.children.length > 30) list.removeChild(list.lastChild);
+}
+
+function activityHTML(c, fresh) {
+  const isGenesis = c.genesis_capture;
+  const typeClass = isGenesis ? 'genesis' : 'verify';
+  const typeLabel = isGenesis ? '⚡ GENESIS CAPTURE' : '✓ VERIFICATION';
+  const when      = timeAgo(c.timestamp);
+  const loc       = c.gps_grid || c.gps_raw || 'UNKNOWN';
+
+  return `<div class="activity-item ${fresh ? 'fresh' : ''}">
+    <div class="act-time">${when}</div>
+    <div class="act-type ${typeClass}">${typeLabel}</div>
+    <div class="act-loc">${loc} // ${c.spotter_id || '—'}</div>
+  </div>`;
+}
+
+// ─── FILTERS ─────────────────────────────────────────────────
+function setFilter(f, btn) {
+  activeFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+
+  let filtered = allCaptures;
+  const now = Date.now();
+
+  if (f === 'genesis')  filtered = allCaptures.filter(c => c.genesis_capture);
+  if (f === 'verified') filtered = allCaptures.filter(c => c.verification_status === 'Verified');
+  if (f === 'pending')  filtered = allCaptures.filter(c => c.verification_status === 'Pending');
+  if (f === 'buffed')   filtered = allCaptures.filter(c => c.verification_status === 'Buffed');
+  if (f === 'recent')   filtered = allCaptures.filter(c => now - new Date(c.timestamp).getTime() < 86400000);
+
+  renderFeed(filtered);
+}
+
+// ─── TIMERS ──────────────────────────────────────────────────
+function startTimers() {
+  clearInterval(timers.tick);
+  timers.tick = setInterval(() => {
+    document.querySelectorAll('.card-timer[data-ts]').forEach(el => {
+      el.textContent = elapsedStr(el.dataset.ts);
+    });
+  }, 1000);
+}
+
+function elapsedStr(ts) {
+  const ms      = Date.now() - new Date(ts).getTime();
+  const totalSec = Math.floor(ms / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  return `${String(h).padStart(3,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+function timeAgo(ts) {
+  const sec = Math.floor((Date.now() - new Date(ts).getTime()) / 1000);
+  if (sec < 10)  return 'JUST NOW';
+  if (sec < 60)  return `${sec}S AGO`;
+  if (sec < 3600) return `${Math.floor(sec/60)}M AGO`;
+  if (sec < 86400) return `${Math.floor(sec/3600)}H AGO`;
+  return `${Math.floor(sec/86400)}D AGO`;
+}
+
+// ─── DEMO MODE ───────────────────────────────────────────────
+function loadDemoData() {
+  const locs = ['40.68,-73.94','34.05,-118.24','51.51,-0.12','48.85,2.35','52.52,13.40','35.68,139.69','43.85,18.35','-33.86,151.21'];
+  const spotters = ['spotter_001','northwall_k','tag_ghost','the_archive','concrete_eyes','buffwatch'];
+  const statuses = ['Pending','Verified','Verified','Buffed'];
+  const qualities = ['Excellent','Good','Good','Fair'];
+
+  const mockData = Array.from({ length: 18 }, (_, i) => {
+    const genesis = Math.random() > 0.6;
+    const hoursAgo = Math.random() * 240;
+    const ts = new Date(Date.now() - hoursAgo * 3600000).toISOString();
+    const loc = locs[i % locs.length];
+    return {
+      id: `demo-${i}`,
+      capture_id: `NB-DEMO-${i}`,
+      timestamp: ts,
+      spotter_id: spotters[i % spotters.length],
+      gps_raw: loc,
+      gps_grid: loc,
+      genesis_capture: genesis,
+      capture_quality: qualities[i % qualities.length],
+      reward_multiplier: genesis ? 1.5 : 1.0,
+      reward_base: genesis ? 100 : 10,
+      total_reward: genesis ? 150 : 10,
+      notes: '',
+      verification_status: genesis ? 'Pending' : statuses[i % statuses.length],
+      photo_url: [
+        'https://images.unsplash.com/photo-1499781350541-7783f6c6a0c8?w=600&h=600&fit=crop',
+        'https://images.unsplash.com/photo-1561214115-f2f134cc4912?w=600&h=600&fit=crop',
+        'https://images.unsplash.com/photo-1578301978162-7aae4d755744?w=600&h=600&fit=crop',
+        'https://images.unsplash.com/photo-1582555172866-f73bb12a2ab3?w=600&h=600&fit=crop',
+        'https://images.unsplash.com/photo-1616003618077-22e810ffbc00?w=600&h=600&fit=crop',
+        'https://images.unsplash.com/photo-1583225214464-9296029427aa?w=600&h=600&fit=crop',
+      ][i % 6]
+    };
+  });
+
+  allCaptures = mockData;
+  renderFeed(mockData);
+  renderActivity(mockData.slice(0,15));
+  startTimers();
+
+  // Demo stats
+  document.getElementById('statTotal').textContent   = mockData.length;
+  document.getElementById('statGenesis').textContent  = mockData.filter(d=>d.genesis_capture).length;
+  document.getElementById('statVerified').textContent = mockData.filter(d=>d.verification_status==='Verified').length;
+  document.getElementById('statBuffed').textContent   = mockData.filter(d=>d.verification_status==='Buffed').length;
+
+  // Simulate live activity in demo
+  setInterval(() => {
+    const lbl = ['⚡ GENESIS CAPTURE','✓ VERIFICATION'];
+    const loc  = locs[Math.floor(Math.random()*locs.length)];
+    const sp   = spotters[Math.floor(Math.random()*spotters.length)];
+    const isG  = Math.random() > 0.5;
+    const div  = document.createElement('div');
+    div.innerHTML = `<div class="activity-item fresh">
+      <div class="act-time">JUST NOW</div>
+      <div class="act-type ${isG?'genesis':'verify'}">${isG?lbl[0]:lbl[1]}</div>
+      <div class="act-loc">${loc} // ${sp}</div>
+    </div>`;
+    const list = document.getElementById('activityList');
+    list.prepend(div.firstElementChild);
+    if (list.children.length > 30) list.removeChild(list.lastChild);
+  }, 7000);
+}
+</script>
+</body>
+</html>

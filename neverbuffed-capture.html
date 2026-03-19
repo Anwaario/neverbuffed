@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>NEVERBUFFED // CAPTURE</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Bebas+Neue&display=swap');
+
+  :root {
+    --black: #000;
+    --white: #fff;
+    --gray: #888;
+    --light: #e8e8e8;
+    --border: 3px solid #fff;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    background: #000;
+    color: #fff;
+    font-family: 'Space Mono', monospace;
+    min-height: 100vh;
+    overscroll-behavior: none;
+  }
+
+  /* HEADER */
+  header {
+    border-bottom: var(--border);
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    background: #000;
+    z-index: 100;
+  }
+
+  .logo {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 28px;
+    letter-spacing: 4px;
+    line-height: 1;
+  }
+
+  .logo span {
+    color: #fff;
+    border: 2px solid #fff;
+    padding: 2px 8px;
+    font-size: 11px;
+    font-family: 'Space Mono', monospace;
+    letter-spacing: 2px;
+    vertical-align: middle;
+    margin-left: 8px;
+  }
+
+  .capture-count {
+    font-size: 11px;
+    color: #888;
+    text-align: right;
+    letter-spacing: 1px;
+  }
+
+  .capture-count strong {
+    display: block;
+    font-size: 22px;
+    color: #fff;
+    font-family: 'Bebas Neue', sans-serif;
+    letter-spacing: 2px;
+  }
+
+  /* MAIN LAYOUT */
+  main {
+    padding: 0;
+  }
+
+  /* CAMERA ZONE */
+  .camera-zone {
+    position: relative;
+    width: 100%;
+    background: #111;
+    border-bottom: var(--border);
+    aspect-ratio: 4/3;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  #videoFeed {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: none;
+  }
+
+  #photoCanvas {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: none;
+  }
+
+  .camera-placeholder {
+    text-align: center;
+    color: #444;
+  }
+
+  .camera-placeholder svg {
+    width: 60px;
+    height: 60px;
+    margin-bottom: 12px;
+    stroke: #444;
+  }
+
+  .camera-placeholder p {
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  /* GPS OVERLAY */
+  .gps-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(transparent, rgba(0,0,0,0.85));
+    padding: 20px 16px 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    pointer-events: none;
+  }
+
+  .gps-data {
+    font-size: 10px;
+    letter-spacing: 1px;
+    color: #fff;
+    line-height: 1.6;
+  }
+
+  .gps-data .label {
+    color: #888;
+    font-size: 9px;
+  }
+
+  .gps-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #fff;
+    animation: pulse 1.5s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.8); }
+  }
+
+  /* CAMERA CONTROLS */
+  .camera-controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    border-bottom: var(--border);
+  }
+
+  .ctrl-btn {
+    background: none;
+    border: none;
+    border-right: 2px solid #fff;
+    color: #fff;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1px;
+    padding: 14px 8px;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: background 0.1s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .ctrl-btn:last-child { border-right: none; }
+
+  .ctrl-btn:active,
+  .ctrl-btn.active { background: #fff; color: #000; }
+
+  .ctrl-btn svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  /* CAPTURE BUTTON */
+  .capture-wrap {
+    padding: 20px;
+    border-bottom: var(--border);
+    display: flex;
+    gap: 12px;
+  }
+
+  #captureBtn {
+    flex: 1;
+    background: #fff;
+    color: #000;
+    border: none;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 22px;
+    letter-spacing: 4px;
+    padding: 16px;
+    cursor: pointer;
+    transition: all 0.1s;
+  }
+
+  #captureBtn:active { background: #ccc; }
+  #captureBtn:disabled { background: #333; color: #666; cursor: not-allowed; }
+
+  #retakeBtn {
+    background: none;
+    border: 2px solid #fff;
+    color: #fff;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1px;
+    padding: 12px 16px;
+    cursor: pointer;
+    text-transform: uppercase;
+    display: none;
+  }
+
+  #retakeBtn:active { background: #fff; color: #000; }
+
+  /* FORM SECTIONS */
+  .section {
+    border-bottom: var(--border);
+  }
+
+  .section-header {
+    padding: 12px 20px;
+    border-bottom: 2px solid #333;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .section-num {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 20px;
+    color: #444;
+    min-width: 24px;
+  }
+
+  .section-title {
+    font-size: 10px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: #fff;
+  }
+
+  .section-body {
+    padding: 16px 20px;
+  }
+
+  /* INPUTS */
+  .field {
+    margin-bottom: 16px;
+  }
+
+  .field:last-child { margin-bottom: 0; }
+
+  .field label {
+    display: block;
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: #888;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  .field input,
+  .field textarea {
+    width: 100%;
+    background: #111;
+    border: 2px solid #333;
+    color: #fff;
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    padding: 10px 12px;
+    outline: none;
+    transition: border-color 0.15s;
+    -webkit-appearance: none;
+    border-radius: 0;
+  }
+
+  .field input:focus,
+  .field textarea:focus {
+    border-color: #fff;
+  }
+
+  .field textarea {
+    resize: none;
+    height: 72px;
+    line-height: 1.5;
+  }
+
+  /* TOGGLE OPTIONS */
+  .toggle-group {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    border: 2px solid #333;
+  }
+
+  .toggle-opt {
+    padding: 12px;
+    text-align: center;
+    cursor: pointer;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    transition: all 0.1s;
+    border-right: 2px solid #333;
+    user-select: none;
+  }
+
+  .toggle-opt:last-child { border-right: none; }
+
+  .toggle-opt.selected {
+    background: #fff;
+    color: #000;
+  }
+
+  .toggle-opt .opt-icon {
+    display: block;
+    font-size: 18px;
+    margin-bottom: 4px;
+  }
+
+  /* QUALITY GRID */
+  .quality-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    border: 2px solid #333;
+  }
+
+  .quality-opt {
+    padding: 10px 4px;
+    text-align: center;
+    cursor: pointer;
+    font-size: 9px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    border-right: 2px solid #333;
+    transition: all 0.1s;
+    user-select: none;
+  }
+
+  .quality-opt:last-child { border-right: none; }
+  .quality-opt.selected { background: #fff; color: #000; }
+
+  .quality-opt .score {
+    display: block;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 18px;
+    margin-bottom: 2px;
+  }
+
+  /* METADATA PREVIEW */
+  .meta-preview {
+    background: #0a0a0a;
+    border: 2px solid #222;
+    padding: 12px;
+    font-size: 10px;
+    line-height: 2;
+    color: #888;
+  }
+
+  .meta-preview span { color: #fff; }
+
+  /* SUBMIT */
+  .submit-zone {
+    padding: 20px;
+  }
+
+  #saveBtn {
+    width: 100%;
+    background: #fff;
+    color: #000;
+    border: none;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 24px;
+    letter-spacing: 6px;
+    padding: 18px;
+    cursor: pointer;
+    transition: all 0.1s;
+    display: block;
+  }
+
+  #saveBtn:active { background: #ccc; transform: scale(0.99); }
+  #saveBtn:disabled { background: #333; color: #555; cursor: not-allowed; }
+
+  .save-sub {
+    font-size: 9px;
+    color: #555;
+    letter-spacing: 1px;
+    text-align: center;
+    margin-top: 8px;
+    text-transform: uppercase;
+  }
+
+  /* SUCCESS STATE */
+  .toast {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: #fff;
+    color: #000;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 20px;
+    letter-spacing: 4px;
+    padding: 14px 28px;
+    z-index: 999;
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    white-space: nowrap;
+  }
+
+  .toast.show {
+    transform: translateX(-50%) translateY(0);
+  }
+
+  /* SAVED LOG */
+  .log-section {
+    border-top: var(--border);
+    padding: 20px;
+  }
+
+  .log-header {
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: #555;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+
+  .log-entry {
+    border: 2px solid #222;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 10px;
+    cursor: pointer;
+    transition: border-color 0.1s;
+  }
+
+  .log-entry:hover { border-color: #555; }
+
+  .log-entry .entry-gps { color: #888; font-size: 9px; }
+  .log-entry .entry-time { color: #555; font-size: 9px; }
+  .log-entry .entry-genesis {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 14px;
+    letter-spacing: 1px;
+  }
+
+  .genesis-tag { color: #fff; }
+  .verify-tag { color: #555; }
+
+  /* WATERMARK PREVIEW */
+  .watermark-note {
+    font-size: 9px;
+    color: #555;
+    letter-spacing: 1px;
+    text-align: center;
+    padding: 8px;
+    text-transform: uppercase;
+  }
+
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="logo">NEVERBUFFED <span>CAPTURE</span></div>
+  </div>
+  <div class="capture-count">
+    <strong id="captureTotal">0</strong>
+    LOGGED
+  </div>
+</header>
+
+<main>
+
+  <!-- CAMERA -->
+  <div class="camera-zone">
+    <video id="videoFeed" autoplay playsinline muted></video>
+    <canvas id="photoCanvas"></canvas>
+    <div class="camera-placeholder" id="camPlaceholder">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+        <circle cx="12" cy="13" r="4"/>
+      </svg>
+      <p>TAP START CAMERA</p>
+    </div>
+    <div class="gps-overlay" id="gpsOverlay" style="display:none">
+      <div class="gps-data">
+        <div class="label">GPS</div>
+        <div id="gpsDisplay">ACQUIRING...</div>
+      </div>
+      <div class="gps-dot" id="gpsDot"></div>
+    </div>
+  </div>
+
+  <!-- CONTROLS -->
+  <div class="camera-controls">
+    <button class="ctrl-btn" id="startCamBtn" onclick="startCamera()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/>
+        <polygon points="10,8 16,12 10,16"/>
+      </svg>
+      START
+    </button>
+    <button class="ctrl-btn" id="flipBtn" onclick="flipCamera()" style="opacity:0.3" disabled>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="1,4 1,10 7,10"/>
+        <path d="M3.51,15a9,9 0 1,0 .49-3.1"/>
+      </svg>
+      FLIP
+    </button>
+    <button class="ctrl-btn" id="gpsBtn" onclick="getLocation()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M12,2L12,6M12,18L12,22M2,12L6,12M18,12L22,12"/>
+      </svg>
+      GPS
+    </button>
+  </div>
+
+  <!-- CAPTURE BTN -->
+  <div class="capture-wrap">
+    <button id="captureBtn" onclick="capturePhoto()" disabled>CAPTURE</button>
+    <button id="retakeBtn" onclick="retake()">RETAKE</button>
+  </div>
+
+  <!-- SECTION 1: IDENTITY -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-num">01</span>
+      <span class="section-title">Spotter Identity</span>
+    </div>
+    <div class="section-body">
+      <div class="field">
+        <label>Spotter ID</label>
+        <input type="text" id="spotterID" value="spotter_001" autocomplete="off" autocorrect="off" autocapitalize="off">
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 2: GENESIS -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-num">02</span>
+      <span class="section-title">Capture Type</span>
+    </div>
+    <div class="section-body">
+      <div class="toggle-group">
+        <div class="toggle-opt selected" id="opt-genesis" onclick="selectGenesis(true)">
+          <span class="opt-icon">⚡</span>
+          GENESIS<br>
+          <span style="font-size:8px;color:inherit;opacity:0.7">+100 $BUFF</span>
+        </div>
+        <div class="toggle-opt" id="opt-verify" onclick="selectGenesis(false)">
+          <span class="opt-icon">✓</span>
+          VERIFY<br>
+          <span style="font-size:8px;color:inherit;opacity:0.7">+10 $BUFF</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 3: QUALITY -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-num">03</span>
+      <span class="section-title">Photo Quality</span>
+    </div>
+    <div class="section-body">
+      <div class="quality-grid">
+        <div class="quality-opt" id="q-excellent" onclick="selectQuality('Excellent', 1.5, this)">
+          <span class="score">1.5×</span>EXCEL
+        </div>
+        <div class="quality-opt selected" id="q-good" onclick="selectQuality('Good', 1.0, this)">
+          <span class="score">1.0×</span>GOOD
+        </div>
+        <div class="quality-opt" id="q-fair" onclick="selectQuality('Fair', 0.7, this)">
+          <span class="score">0.7×</span>FAIR
+        </div>
+        <div class="quality-opt" id="q-poor" onclick="selectQuality('Poor', 0.5, this)">
+          <span class="score">0.5×</span>POOR
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 4: NOTES -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-num">04</span>
+      <span class="section-title">Field Notes</span>
+    </div>
+    <div class="section-body">
+      <div class="field">
+        <label>Notes</label>
+        <textarea id="notesField" placeholder="Style, location details, surface type..."></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 5: METADATA PREVIEW -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-num">05</span>
+      <span class="section-title">Metadata Preview</span>
+    </div>
+    <div class="section-body">
+      <div class="meta-preview" id="metaPreview">
+        GPS_RAW — <span id="prev-gps">NONE</span><br>
+        GPS_GRID — <span id="prev-grid">NONE</span><br>
+        TIMESTAMP — <span id="prev-ts">—</span><br>
+        SPOTTER — <span id="prev-spotter">spotter_001</span><br>
+        TYPE — <span id="prev-genesis">GENESIS</span><br>
+        QUALITY — <span id="prev-quality">Good (1.0×)</span><br>
+        REWARD — <span id="prev-reward">100 $BUFF</span><br>
+        PHOTO — <span id="prev-photo">NOT CAPTURED</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- SAVE -->
+  <div class="submit-zone">
+    <button id="saveBtn" onclick="saveCapture()" disabled>SAVE CAPTURE</button>
+    <p class="save-sub">Saves locally · Exports JSON + watermarked photo</p>
+  </div>
+
+  <!-- LOG -->
+  <div class="log-section" id="logSection" style="display:none">
+    <div class="log-header">SESSION LOG</div>
+    <div id="logList"></div>
+  </div>
+
+</main>
+
+<div class="toast" id="toast">CAPTURED ⚡</div>
+
+<script>
+// STATE
+let stream = null;
+let useFront = false;
+let coords = null;
+let photoTaken = false;
+let isGenesis = true;
+let qualityLabel = 'Good';
+let qualityMult = 1.0;
+let sessionLog = [];
+
+const video = document.getElementById('videoFeed');
+const canvas = document.getElementById('photoCanvas');
+const ctx = canvas.getContext('2d');
+
+// CAMERA
+async function startCamera() {
+  try {
+    if (stream) { stream.getTracks().forEach(t => t.stop()); }
+    const constraints = {
+      video: {
+        facingMode: useFront ? 'user' : 'environment',
+        width: { ideal: 1280 },
+        height: { ideal: 960 }
+      }
+    };
+    stream = await navigator.mediaDevices.getUserMedia(constraints);
+    video.srcObject = stream;
+    video.style.display = 'block';
+    canvas.style.display = 'none';
+    document.getElementById('camPlaceholder').style.display = 'none';
+    document.getElementById('captureBtn').disabled = false;
+    document.getElementById('flipBtn').disabled = false;
+    document.getElementById('flipBtn').style.opacity = '1';
+    document.getElementById('retakeBtn').style.display = 'none';
+    photoTaken = false;
+    updatePreview();
+    getLocation();
+  } catch(e) {
+    alert('Camera access denied. Please allow camera permissions.');
+  }
+}
+
+function flipCamera() {
+  useFront = !useFront;
+  document.getElementById('flipBtn').classList.toggle('active', useFront);
+  startCamera();
+}
+
+// CAPTURE + WATERMARK
+function capturePhoto() {
+  if (!stream) return;
+
+  const vw = video.videoWidth || 1280;
+  const vh = video.videoHeight || 960;
+  canvas.width = vw;
+  canvas.height = vh;
+
+  // Draw frame
+  ctx.drawImage(video, 0, 0, vw, vh);
+
+  // Watermark
+  applyWatermark(ctx, vw, vh);
+
+  video.style.display = 'none';
+  canvas.style.display = 'block';
+  document.getElementById('captureBtn').disabled = true;
+  document.getElementById('retakeBtn').style.display = 'block';
+  photoTaken = true;
+  document.getElementById('saveBtn').disabled = false;
+
+  document.getElementById('prev-photo').textContent = 'READY';
+  updatePreview();
+}
+
+function applyWatermark(ctx, w, h) {
+  const now = new Date();
+  const ts = now.toISOString().replace('T', ' ').substring(0, 19);
+  const gpsText = coords ? `${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)}` : 'GPS PENDING';
+  const typeText = isGenesis ? '⚡ GENESIS' : '✓ VERIFY';
+
+  // Bottom bar
+  const barH = Math.round(h * 0.12);
+  ctx.fillStyle = 'rgba(0,0,0,0.82)';
+  ctx.fillRect(0, h - barH, w, barH);
+
+  // Top-right badge
+  const badgeW = Math.round(w * 0.28);
+  const badgeH = Math.round(h * 0.058);
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(w - badgeW - 10, 10, badgeW, badgeH);
+  ctx.fillStyle = '#000';
+  ctx.font = `bold ${Math.round(h * 0.024)}px 'Courier New', monospace`;
+  ctx.textAlign = 'center';
+  ctx.fillText('NEVERBUFFED.IO', w - badgeW/2 - 10, 10 + badgeH * 0.68);
+
+  // Bottom text
+  const baseFontSize = Math.round(h * 0.022);
+  ctx.font = `${baseFontSize}px 'Courier New', monospace`;
+  ctx.textAlign = 'left';
+
+  ctx.fillStyle = '#888';
+  ctx.fillText('GPS', 16, h - barH + barH * 0.28);
+  ctx.fillStyle = '#fff';
+  ctx.fillText(gpsText, 16, h - barH + barH * 0.58);
+
+  ctx.fillStyle = '#888';
+  ctx.fillText('TIME', 16, h - barH + barH * 0.88);
+
+  // Right side
+  ctx.textAlign = 'right';
+  ctx.fillStyle = '#888';
+  ctx.fillText('TYPE', w - 16, h - barH + barH * 0.28);
+  ctx.fillStyle = '#fff';
+  ctx.fillText(typeText, w - 16, h - barH + barH * 0.58);
+
+  ctx.fillStyle = '#888';
+  ctx.fillText('QUALITY', w - 16, h - barH + barH * 0.88);
+
+  // Center bottom
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#fff';
+  ctx.fillText(ts + ' UTC', w/2, h - barH + barH * 0.88);
+  ctx.fillStyle = '#fff';
+  ctx.fillText(qualityLabel.toUpperCase(), w - 16, h - barH + barH * 0.88);
+}
+
+function retake() {
+  canvas.style.display = 'none';
+  video.style.display = 'block';
+  document.getElementById('captureBtn').disabled = false;
+  document.getElementById('retakeBtn').style.display = 'none';
+  photoTaken = false;
+  document.getElementById('prev-photo').textContent = 'NOT CAPTURED';
+  document.getElementById('saveBtn').disabled = true;
+}
+
+// GPS
+function getLocation() {
+  document.getElementById('gpsOverlay').style.display = 'flex';
+  document.getElementById('gpsDisplay').textContent = 'ACQUIRING...';
+  document.getElementById('gpsBtn').classList.add('active');
+
+  if (!navigator.geolocation) {
+    document.getElementById('gpsDisplay').textContent = 'UNAVAILABLE';
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(pos => {
+    coords = pos.coords;
+    const lat = coords.latitude.toFixed(5);
+    const lng = coords.longitude.toFixed(5);
+    document.getElementById('gpsDisplay').textContent = `${lat}, ${lng}`;
+    document.getElementById('gpsBtn').classList.remove('active');
+    updatePreview();
+  }, () => {
+    document.getElementById('gpsDisplay').textContent = 'DENIED';
+    document.getElementById('gpsBtn').classList.remove('active');
+  }, { enableHighAccuracy: true, timeout: 10000 });
+}
+
+// GENESIS TOGGLE
+function selectGenesis(genesis) {
+  isGenesis = genesis;
+  document.getElementById('opt-genesis').classList.toggle('selected', genesis);
+  document.getElementById('opt-verify').classList.toggle('selected', !genesis);
+  updatePreview();
+}
+
+// QUALITY
+function selectQuality(label, mult, el) {
+  qualityLabel = label;
+  qualityMult = mult;
+  document.querySelectorAll('.quality-opt').forEach(e => e.classList.remove('selected'));
+  el.classList.add('selected');
+  updatePreview();
+}
+
+// PREVIEW UPDATE
+function updatePreview() {
+  const now = new Date();
+  const ts = now.toISOString();
+  const spotter = document.getElementById('spotterID').value || 'spotter_001';
+  const rewardBase = isGenesis ? 100 : 10;
+  const reward = Math.round(rewardBase * qualityMult);
+
+  document.getElementById('prev-ts').textContent = ts.substring(0, 19).replace('T', ' ');
+  document.getElementById('prev-spotter').textContent = spotter;
+  document.getElementById('prev-genesis').textContent = isGenesis ? 'GENESIS' : 'VERIFY';
+  document.getElementById('prev-quality').textContent = `${qualityLabel} (${qualityMult}×)`;
+  document.getElementById('prev-reward').textContent = `${reward} $BUFF`;
+
+  if (coords) {
+    const lat = coords.latitude;
+    const lng = coords.longitude;
+    const rLat = Math.round(lat * 100) / 100;
+    const rLng = Math.round(lng * 100) / 100;
+    document.getElementById('prev-gps').textContent = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    document.getElementById('prev-grid').textContent = `${rLat}, ${rLng}`;
+  }
+}
+
+// SAVE
+function saveCapture() {
+  if (!photoTaken) return;
+
+  const now = new Date();
+  const ts = now.toISOString();
+  const spotter = document.getElementById('spotterID').value || 'spotter_001';
+  const notes = document.getElementById('notesField').value;
+  const rewardBase = isGenesis ? 100 : 10;
+  const reward = Math.round(rewardBase * qualityMult);
+
+  let lat = null, lng = null, gpsRaw = 'NONE', gpsGrid = 'NONE';
+  if (coords) {
+    lat = coords.latitude;
+    lng = coords.longitude;
+    gpsRaw = `${lat.toFixed(5)},${lng.toFixed(5)}`;
+    const rLat = Math.round(lat * 100) / 100;
+    const rLng = Math.round(lng * 100) / 100;
+    gpsGrid = `${rLat},${rLng}`;
+  }
+
+  const captureID = `NB-${Date.now()}`;
+
+  const metadata = {
+    capture_id: captureID,
+    timestamp: ts,
+    spotter_id: spotter,
+    gps_raw: gpsRaw,
+    gps_grid: gpsGrid,
+    latitude: lat,
+    longitude: lng,
+    genesis_capture: isGenesis,
+    capture_quality: qualityLabel,
+    reward_multiplier: qualityMult,
+    reward_base: rewardBase,
+    total_reward: reward,
+    notes: notes,
+    verification_status: 'Pending',
+    photo_file: `${captureID}.jpg`
+  };
+
+  // Download watermarked photo
+  const photoBlob = canvas.toBlob(blob => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${captureID}.jpg`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, 'image/jpeg', 0.92);
+
+  // Download metadata JSON
+  setTimeout(() => {
+    const jsonBlob = new Blob([JSON.stringify(metadata, null, 2)], { type: 'application/json' });
+    const url2 = URL.createObjectURL(jsonBlob);
+    const a2 = document.createElement('a');
+    a2.href = url2;
+    a2.download = `${captureID}.json`;
+    a2.click();
+    URL.revokeObjectURL(url2);
+  }, 500);
+
+  // Add to session log
+  sessionLog.unshift({ ...metadata });
+  updateLog();
+
+  // Counter
+  document.getElementById('captureTotal').textContent = sessionLog.length;
+
+  // Toast
+  const toast = document.getElementById('toast');
+  toast.textContent = isGenesis ? '⚡ GENESIS LOGGED' : '✓ VERIFY LOGGED';
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 2500);
+
+  // Reset for next capture
+  setTimeout(() => {
+    retake();
+    document.getElementById('notesField').value = '';
+    updatePreview();
+  }, 300);
+}
+
+// LOG
+function updateLog() {
+  const section = document.getElementById('logSection');
+  const list = document.getElementById('logList');
+  section.style.display = 'block';
+
+  list.innerHTML = sessionLog.map(entry => `
+    <div class="log-entry">
+      <div>
+        <div>${entry.capture_id}</div>
+        <div class="entry-gps">${entry.gps_raw}</div>
+      </div>
+      <div style="text-align:right">
+        <div class="entry-genesis ${entry.genesis_capture ? 'genesis-tag' : 'verify-tag'}">
+          ${entry.genesis_capture ? '⚡ GENESIS' : '✓ VERIFY'}
+        </div>
+        <div class="entry-time">${entry.timestamp.substring(11, 19)} UTC</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+// LIVE METADATA UPDATE
+document.getElementById('spotterID').addEventListener('input', updatePreview);
+
+// INIT
+updatePreview();
+</script>
+</body>
+</html>
