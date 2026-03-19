@@ -502,44 +502,50 @@ animation: blink 0.8s step-end infinite;
 
 <script>
 // ── SUPABASE ──────────────────────────────────────────────
-const SUPABASE_URL = localStorage.getItem('nb_sb_url') || '';
-const SUPABASE_KEY = localStorage.getItem('nb_sb_key') || '';
 const TABLE = 'captures';
-
 let sb = null;
 let allCaptures = [];
 let tickInterval;
 
-if (SUPABASE_URL && SUPABASE_KEY) {
-  sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-  init();
-} else {
-  loadDemo();
+// Always load demo first so the page is never blank
+loadDemo();
+
+// Then try Supabase in background if credentials exist
+try {
+  const SUPABASE_URL = localStorage.getItem('nb_sb_url') || '';
+  const SUPABASE_KEY = localStorage.getItem('nb_sb_key') || '';
+  if (SUPABASE_URL && SUPABASE_KEY && typeof supabase !== 'undefined') {
+    sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    init();
+  }
+} catch(e) {
+  console.warn('Supabase init failed, running in demo mode', e);
 }
 
 async function init() {
-  const { data, error } = await sb
-    .from(TABLE)
-    .select('*')
-    .order('timestamp', { ascending: false })
-    .limit(60);
+  try {
+    const { data, error } = await sb
+      .from(TABLE)
+      .select('*')
+      .order('timestamp', { ascending: false })
+      .limit(60);
 
-  if (error || !data) { loadDemo(); return; }
+    if (error || !data || data.length === 0) return;
 
-  allCaptures = data;
-  renderFeed(data);
-  renderActivity(data.slice(0, 20));
-  setStats(data);
-  startTimers();
+    allCaptures = data;
+    renderFeed(data);
+    renderActivity(data.slice(0, 20));
+    setStats(data);
+    startTimers();
 
-  // Realtime
-  sb.channel('feed')
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: TABLE }, p => {
-      allCaptures.unshift(p.new);
-      prependCard(p.new);
-      prependAct(p.new, true);
-      setStats(allCaptures);
-    })
+    // Realtime
+    sb.channel('feed')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: TABLE }, p => {
+        allCaptures.unshift(p.new);
+        prependCard(p.new);
+        prependAct(p.new, true);
+        setStats(allCaptures);
+      })
     .subscribe();
 }
 
